@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimisation de Transport</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+                ::-webkit-scrollbar {
+            width: 7px;
+            height: 7px;
+            border-radius: 10px;
+
+        }
+
+        /* Track */
+        ::-webkit-scrollbar-track {
+            background-color: transparent;
+            box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Handle */
+        ::-webkit-scrollbar-thumb {
+            background: #1967D2;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-corner {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-[url('/static/images/indexbg.jpg')] bg-cover bg-center">
+    <div class="max-w-4xl mx-auto my-4  px-4 py-10 bg-gray-50/50 rounded-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-600 mb-8">Optimisation de Réseau de Transport</h1>
+
+        <!-- Messages d'erreur/succès -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="space-y-3 mb-6">
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded text-sm 
+                            {% if category == 'success' %}bg-green-100 text-green-800
+                            {% elif category == 'error' %}bg-red-100 text-red-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" id="transport-form" class="space-y-6">
+            <div id="routes-container" class="space-y-6">
+                <!-- Routes will be inserted here -->
+            </div>
+
+            <div class="flex flex-wrap gap-4">
+                <button type="button" id="add-route" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded text-sm">
+                    + Ajouter une route
+                </button>
+                <button type="button" id="load-example" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded text-sm">
+                    ⭳ Exemple pré-rempli
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block mb-1 font-medium">sommet source:</label>
+                    <input type="text" name="source" value="{{ source if source else '' }}" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring focus:ring-blue-200">
+                </div>
+                <div>
+                    <label class="block mb-1 font-medium">sommet destination:</label>
+                    <input type="text" name="target" value="{{ target if target else '' }}" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring focus:ring-blue-200">
+                </div>
+            </div>
+
+            <div>
+                <label class="block mb-1 font-medium">Méthode d'optimisation:</label>
+                <select name="algorithm" class="w-full px-3 py-2 border border-gray-300 rounded focus:ring focus:ring-blue-200">
+                    <option value="max_flow" {% if algorithm == 'max_flow' %}selected{% endif %}>Flot maximal (Ford-Fulkerson)</option>
+                    <option value="edmonds_karp" {% if algorithm == 'edmonds_karp' %}selected{% endif %}>Flot maximal (Edmonds-Karp)</option>
+                    <option value="push_relabel" {% if algorithm == 'push_relabel' %}selected{% endif %}>Flot Maximal (Push-Relabel)</option>
+                    <option value="min_cost" {% if algorithm == 'min_cost' %}selected{% endif %}>Coût minimal</option>
+                </select>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
+                Calculer l'optimisation
+            </button>
+        </form>
+    </div>
+
+    <template id="route-template">
+        <div class="bg-white/70 p-6 rounded shadow route-section relative">
+            <h3 class="text-lg font-semibold mb-4">Route <span class="route-number"></span></h3>
+            <button type="button" class="absolute top-2 right-2 text-red-600 hover:text-red-800 text-sm" onclick="removeRoute(this)">
+                <svg fill="#E53935"  height="15px" width="15px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+                    viewBox="0 0 290 290" xml:space="preserve">
+                    <g id="XMLID_24_">
+                        <g id="XMLID_29_">
+                            <path d="M265,60h-30h-15V15c0-8.284-6.716-15-15-15H85c-8.284,0-15,6.716-15,15v45H55H25c-8.284,0-15,6.716-15,15s6.716,15,15,15
+                                h5.215H40h210h9.166H265c8.284,0,15-6.716,15-15S273.284,60,265,60z M190,60h-15h-60h-15V30h90V60z"/>
+                        </g>
+                        <g id="XMLID_86_">
+                            <path d="M40,275c0,8.284,6.716,15,15,15h180c8.284,0,15-6.716,15-15V120H40V275z"/>
+                        </g>
+                    </g>
+                </svg>
+            </button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm mb-1">sommet de départ:</label>
+                    <input type="text" name="from_city" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring focus:ring-blue-200">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1">sommet d'arrivée:</label>
+                    <input type="text" name="to_city" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring focus:ring-blue-200">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1">Capacité:</label>
+                    <input type="number" name="capacity" min="1" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring focus:ring-blue-200">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1">Coût:</label>
+                    <input type="number" name="cost" min="0" step="0.01" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring focus:ring-blue-200">
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        let routeCount = {{ routes|length if routes else 1 }};
+        const container = document.getElementById('routes-container');
+        const routeTemplate = document.getElementById('route-template').content;
+
+        function updateRouteNumbers() {
+            document.querySelectorAll('.route-section').forEach((section, index) => {
+                section.querySelector('.route-number').textContent = index + 1;
+            });
+        }
+
+        function addRoute(data = {}) {
+            const clone = document.importNode(routeTemplate, true);
+            const inputs = clone.querySelectorAll('input');
+
+            inputs[0].value = data.from || '';
+            inputs[1].value = data.to || '';
+            inputs[2].value = data.capacity || '';
+            inputs[3].value = data.cost || '';
+
+            container.appendChild(clone);
+            updateRouteNumbers();
+        }
+
+        function removeRoute(button) {
+            if (document.querySelectorAll('.route-section').length > 1) {
+                button.closest('.route-section').remove();
+                updateRouteNumbers();
+            } else {
+                alert("Vous devez avoir au moins une route");
+            }
+        }
+
+        document.getElementById('add-route').addEventListener('click', () => addRoute());
+
+        document.getElementById('load-example').addEventListener('click', () => {
+            const exampleRoutes = [
+                { from: 'A', to: 'B', capacity: 100, cost: 500, time: 6 },
+                { from: 'A', to: 'C', capacity: 120, cost: 400, time: 5 },
+                { from: 'B', to: 'D', capacity: 80, cost: 300, time: 4 },
+                { from: 'C', to: 'D', capacity: 70, cost: 200, time: 3 },
+                { from: 'C', to: 'E', capacity: 60, cost: 350, time: 6 },
+                { from: 'D', to: 'E', capacity: 150, cost: 250, time: 2 },
+                { from: 'B', to: 'E', capacity: 90, cost: 450, time: 5 }
+            ];
+
+            container.innerHTML = '';
+            exampleRoutes.forEach(route => addRoute(route));
+
+            document.querySelector('input[name="source"]').value = "A";
+            document.querySelector('input[name="target"]').value = "E";
+        });
+
+        // Add first route on load
+        {% if routes %}
+            const prefilledRoutes = {{ routes|tojson }};
+            prefilledRoutes.forEach(route => addRoute(route));
+        {% else %}
+            addRoute();
+        {% endif %}
+    </script>
+</body>
+</html>
